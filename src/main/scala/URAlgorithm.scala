@@ -104,7 +104,7 @@ case class URAlgorithmParams(
   expireDateName: Option[String] = Some(DefaultURAlgoParams.ExpireDateName),
   // used as the subject of a dateRange in queries, specifies the name of the item property
   dateName: Option[String] = Some(DefaultURAlgoParams.DateName),
-  seed: Option[Long] = None) // seed is not used presently
+  seed: Option[Long] = None), // seed is not used presently
   minScore: Option[Float] = None)
   extends Params //fixed default make it reproducible unless supplied
   */
