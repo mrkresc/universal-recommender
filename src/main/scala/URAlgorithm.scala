@@ -166,7 +166,8 @@ case class URAlgorithmParams(
   // used as the subject of a dateRange in queries, specifies the name of the item property
   dateName: Option[String] = None,
   indicators: Option[List[IndicatorParams]] = None, // control params per matrix pair
-  seed: Option[Long] = None, // seed is not used presently
+  seed: Option[Long] = None), // seed is not used presently
+  minScore: Option[Float] = None),
   numESWriteConnections: Option[Int] = None) // hint about how to coalesce partitions so we don't overload ES when
     // writing the model. The rule of thumb is (numberOfNodesHostingPrimaries * bulkRequestQueueLength) * 0.75
     // for ES 1.7 bulk queue is defaulted to 50
