@@ -192,7 +192,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
   case class FilterCorrelators(actionName: String, itemIDs: Seq[ItemID])
   case class ExclusionFields(propertyName: String, values: Seq[String])
 
-  val appName: String = ap.appName
+  val appName: String = query.appName.getOrElse(ap.appName)
   val recsModel: String = ap.recsModel.getOrElse(DefaultURAlgoParams.RecsModel)
   //val eventNames: Seq[String] = ap.eventNames
 
