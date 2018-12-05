@@ -64,7 +64,8 @@ object DefaultURAlgoParams {
   val BackfillFieldName = RankingFieldName.PopRank
   val BackfillType = RankingType.Popular
   val BackfillDuration = "3650 days" // for all time
-
+  val DefaultMinScore = 0.0001f
+  
   val ReturnSelf = false
   val NumESWriteConnections: Option[Int] = None
 }
@@ -104,6 +105,7 @@ case class URAlgorithmParams(
   // used as the subject of a dateRange in queries, specifies the name of the item property
   dateName: Option[String] = Some(DefaultURAlgoParams.DateName),
   seed: Option[Long] = None) // seed is not used presently
+  minScore: Option[Float] = None)
   extends Params //fixed default make it reproducible unless supplied
   */
 
@@ -266,7 +268,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     ap.availableDateName,
     ap.expireDateName).collect { case Some(date) => date } distinct
 
-  val esIndex: String = ap.indexName
+  val esIndex: String = query.indexName.getOrElse(ap.indexName)
   val esType: String = ap.typeName
 
   drawInfo("Init URAlgorithm", Seq(
@@ -591,9 +593,13 @@ class URAlgorithm(val ap: URAlgorithmParams)
       val sort = buildQuerySort()
       logger.info(s"buildQuerySort returned sort: ${sort}")
 
+	  val minScore = ap.minScore.getOrElse(DefaultURAlgoParams.DefaultMinScore)
+	  
       val json =
         ("from" -> startPos) ~
           ("size" -> numRecs) ~
+		  ("_source"-> ("include" -> "id")) ~
+		  ("min_score"-> minScore) ~
           ("query" ->
             ("bool" ->
               ("should" -> should) ~
