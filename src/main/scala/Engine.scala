@@ -30,6 +30,8 @@ import com.actionml.helpers._
  *  an item id. All other values are optional.
  */
 case class Query(
+  appName: Option[String] = None, // app name override
+  indexName: Option[String] = None, // index name override
   user: Option[String] = None, // must be a user or item id
   userBias: Option[Float] = None, // default: whatever is in algorithm params or 1
   item: Option[String] = None, // must be a user or item id
