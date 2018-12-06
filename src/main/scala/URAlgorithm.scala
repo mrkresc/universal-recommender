@@ -67,6 +67,8 @@ object DefaultURAlgoParams {
 
   val ReturnSelf = false
   val NumESWriteConnections: Option[Int] = None
+  
+  val DefaultMinScore = 0.0001f
 }
 
 /* default values must be set in code not the case class declaration
@@ -164,7 +166,8 @@ case class URAlgorithmParams(
   // used as the subject of a dateRange in queries, specifies the name of the item property
   dateName: Option[String] = None,
   indicators: Option[List[IndicatorParams]] = None, // control params per matrix pair
-  seed: Option[Long] = None, // seed is not used presently
+  seed: Option[Long] = None,
+  minScore: Option[Float] = None, // seed is not used presently,
   numESWriteConnections: Option[Int] = None) // hint about how to coalesce partitions so we don't overload ES when
     // writing the model. The rule of thumb is (numberOfNodesHostingPrimaries * bulkRequestQueueLength) * 0.75
     // for ES 1.7 bulk queue is defaulted to 50
@@ -482,7 +485,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
    *       ranking if no PopModel is being used, same for "must" clause and dates.
    */
   def predict(model: NullModel, query: Query): PredictedResult = {
-
+	val esIndex: String = query.indexName.getOrElse(ap.indexName)
     queryEventNames = query.eventNames.getOrElse(modelEventNames) // eventNames in query take precedence
 
     val (queryStr, blacklist) = buildQuery(ap, query, rankingFieldNames)
@@ -591,9 +594,13 @@ class URAlgorithm(val ap: URAlgorithmParams)
       val sort = buildQuerySort()
       logger.info(s"buildQuerySort returned sort: ${sort}")
 
+	  val minScore = ap.minScore.getOrElse(DefaultURAlgoParams.DefaultMinScore)
+	  
       val json =
         ("from" -> startPos) ~
           ("size" -> numRecs) ~
+		  ("_source"-> ("include" -> "id")) ~
+		  ("min_score"-> minScore) ~
           ("query" ->
             ("bool" ->
               ("should" -> should) ~
@@ -770,7 +777,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
   def getBiasedSimilarItems(query: Query): Seq[BoostableCorrelators] = {
     if (query.item.nonEmpty) {
       logger.info(s"using item ${query.item.get}")
-      val m = EsClient.getSource(esIndex, esType, query.item.get)
+      val m = EsClient.getSource(query.indexName.getOrElse(ap.indexName), esType, query.item.get)
       logger.info(s"got source: ${m}")
 
       if (m.nonEmpty) {
@@ -796,7 +803,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
 
     val recentEvents = try {
       LEventStore.findByEntity(
-        appName = appName,
+        appName = query.appName.getOrElse(ap.appName),
         // entityType and entityId is specified for fast lookup
         entityType = "user",
         entityId = query.user.get,
