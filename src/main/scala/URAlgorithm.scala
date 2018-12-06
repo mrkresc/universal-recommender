@@ -64,10 +64,11 @@ object DefaultURAlgoParams {
   val BackfillFieldName = RankingFieldName.PopRank
   val BackfillType = RankingType.Popular
   val BackfillDuration = "3650 days" // for all time
-  val DefaultMinScore = 0.0001f
-  
+
   val ReturnSelf = false
   val NumESWriteConnections: Option[Int] = None
+  
+  val DefaultMinScore = 0.0001f
 }
 
 /* default values must be set in code not the case class declaration
@@ -104,8 +105,7 @@ case class URAlgorithmParams(
   expireDateName: Option[String] = Some(DefaultURAlgoParams.ExpireDateName),
   // used as the subject of a dateRange in queries, specifies the name of the item property
   dateName: Option[String] = Some(DefaultURAlgoParams.DateName),
-  seed: Option[Long] = None), // seed is not used presently
-  minScore: Option[Float] = None)
+  seed: Option[Long] = None) // seed is not used presently
   extends Params //fixed default make it reproducible unless supplied
   */
 
@@ -166,8 +166,8 @@ case class URAlgorithmParams(
   // used as the subject of a dateRange in queries, specifies the name of the item property
   dateName: Option[String] = None,
   indicators: Option[List[IndicatorParams]] = None, // control params per matrix pair
-  seed: Option[Long] = None), // seed is not used presently
-  minScore: Option[Float] = None),
+  seed: Option[Long] = None,
+  minScore: Option[Float] = None, // seed is not used presently,
   numESWriteConnections: Option[Int] = None) // hint about how to coalesce partitions so we don't overload ES when
     // writing the model. The rule of thumb is (numberOfNodesHostingPrimaries * bulkRequestQueueLength) * 0.75
     // for ES 1.7 bulk queue is defaulted to 50
@@ -195,7 +195,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
   case class FilterCorrelators(actionName: String, itemIDs: Seq[ItemID])
   case class ExclusionFields(propertyName: String, values: Seq[String])
 
-  val appName: String = query.appName.getOrElse(ap.appName)
+  val appName: String = ap.appName
   val recsModel: String = ap.recsModel.getOrElse(DefaultURAlgoParams.RecsModel)
   //val eventNames: Seq[String] = ap.eventNames
 
@@ -269,7 +269,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     ap.availableDateName,
     ap.expireDateName).collect { case Some(date) => date } distinct
 
-  val esIndex: String = query.indexName.getOrElse(ap.indexName)
+  val esIndex: String = ap.indexName
   val esType: String = ap.typeName
 
   drawInfo("Init URAlgorithm", Seq(
@@ -485,7 +485,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
    *       ranking if no PopModel is being used, same for "must" clause and dates.
    */
   def predict(model: NullModel, query: Query): PredictedResult = {
-
+	val esIndex: String = query.indexName.getOrElse(ap.indexName)
     queryEventNames = query.eventNames.getOrElse(modelEventNames) // eventNames in query take precedence
 
     val (queryStr, blacklist) = buildQuery(ap, query, rankingFieldNames)
@@ -777,7 +777,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
   def getBiasedSimilarItems(query: Query): Seq[BoostableCorrelators] = {
     if (query.item.nonEmpty) {
       logger.info(s"using item ${query.item.get}")
-      val m = EsClient.getSource(esIndex, esType, query.item.get)
+      val m = EsClient.getSource(query.indexName.getOrElse(ap.indexName), esType, query.item.get)
       logger.info(s"got source: ${m}")
 
       if (m.nonEmpty) {
@@ -803,7 +803,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
 
     val recentEvents = try {
       LEventStore.findByEntity(
-        appName = appName,
+        appName = query.appName.getOrElse(ap.appName),
         // entityType and entityId is specified for fast lookup
         entityType = "user",
         entityId = query.user.get,
